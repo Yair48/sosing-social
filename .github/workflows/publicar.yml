@@ -1,0 +1,43 @@
+name: Publicacion diaria SOSING (Facebook e Instagram)
+
+on:
+  schedule:
+    # 12:00 UTC = 7:00 a.m. hora Colombia, todos los días.
+    - cron: "0 12 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publicar
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Publicar el post de hoy
+        env:
+          META_TOKEN: ${{ secrets.META_TOKEN }}
+        run: python publish.py
+
+      - name: Guardar la bitacora
+        if: always()
+        run: |
+          git config user.name "sosing-publicador[bot]"
+          git config user.email "publicador@sosing.local"
+          git add publicados.log
+          if git diff --cached --quiet; then
+            echo "Sin cambios en la bitacora"
+          else
+            git commit -m "Publicacion $(date -u +%Y-%m-%d)"
+            git pull --rebase --autostash
+            git push
+          fi
